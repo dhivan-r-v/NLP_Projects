@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Feedback Analysis</title>
+  <meta name="description" content="Classify customer feedback as positive, neutral or negative." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231a1a18'/><rect x='3' y='9' width='2' height='4' fill='%23f3f1ec'/><rect x='7' y='5' width='2' height='8' fill='%23f3f1ec'/><rect x='11' y='7' width='2' height='6' fill='%23f3f1ec'/></svg>" />
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-row">
+      <div class="title">
+        <b>Feedback Analysis</b>
+        <span class="meta" id="modelMeta">loading model…</span>
+      </div>
+      <div class="masthead-right">
+        <span class="api" id="apiStatus"><i></i><span>api</span></span>
+        <button class="textbtn" id="themeToggle" type="button">dark</button>
+      </div>
+    </div>
+    <nav class="wrap tabs" role="tablist" aria-label="Views">
+      <button class="tab is-active" role="tab" aria-selected="true" data-view="single">Single</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="batch">Batch</button>
+      <button class="tab" role="tab" aria-selected="false" data-view="history">History <span id="historyCount" class="count">0</span></button>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- ================= SINGLE ================= -->
+    <section class="view" id="view-single" role="tabpanel">
+      <div class="split">
+        <div class="col">
+          <div class="label-row">
+            <label for="feedbackInput">Review text</label>
+            <span class="meta" id="charCount">0 / 5000</span>
+          </div>
+          <textarea id="feedbackInput" maxlength="5000" spellcheck="false" placeholder="Paste a customer review."></textarea>
+
+          <div class="row-between">
+            <div class="examples">
+              <span class="meta">Examples:</span>
+              <button class="textbtn" data-example="Absolutely love this tablet. Fast, light and the screen is gorgeous. Best purchase this year.">praise</button>
+              <button class="textbtn" data-example="Stopped charging after two weeks and customer support never replied. Very disappointed, would not recommend.">complaint</button>
+              <button class="textbtn" data-example="Bought it for my kid to read books. It arrived on Tuesday in a cardboard box.">factual</button>
+              <button class="textbtn" data-example="Great sound quality but the app keeps crashing and the battery dies quickly.">mixed</button>
+            </div>
+            <div class="buttons">
+              <button class="btn" id="clearBtn" type="button">Clear</button>
+              <button class="btn solid" id="analyzeBtn" type="button">Analyze</button>
+            </div>
+          </div>
+          <p class="hint meta">Ctrl + Enter to analyze.</p>
+        </div>
+
+        <div class="col readout" id="readout">
+          <div class="label-row"><span class="label">Result</span></div>
+
+          <p class="placeholder" id="resultEmpty">Nothing analyzed yet.</p>
+
+          <div id="result" hidden>
+            <div class="verdict">
+              <span class="verdict-word" id="verdictWord"></span>
+              <span class="verdict-conf"><b id="verdictConf"></b> confidence</span>
+            </div>
+
+            <div class="stack" id="probStack" aria-label="Class probabilities"></div>
+            <dl class="stack-legend" id="probLegend"></dl>
+
+            <p class="warn" id="lowSignal" hidden>None of these words are in the model's vocabulary. Treat this result as a guess.</p>
+
+            <h3>What the model read</h3>
+            <p class="meta small-gap">Text after cleaning and lemmatising. Shading shows how much each word pushed toward <span id="towardClass"></span>; struck-through words are unknown to the model.</p>
+            <p class="tokens" id="tokens"></p>
+
+            <h3>Strongest terms</h3>
+            <table class="terms">
+              <thead><tr><th>Term</th><th class="num">Effect</th><th class="bar-col"></th></tr></thead>
+              <tbody id="termsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= BATCH ================= -->
+    <section class="view" id="view-batch" role="tabpanel" hidden>
+      <div class="label-row">
+        <label for="batchInput">Reviews, one per line (max 500)</label>
+        <span class="meta" id="batchCount">0 reviews</span>
+      </div>
+      <div class="drop" id="dropzone">
+        <textarea id="batchInput" class="mono" spellcheck="false" placeholder="One review per line, or drop a .csv / .txt file here."></textarea>
+      </div>
+      <input type="file" id="fileInput" accept=".csv,.txt" hidden />
+
+      <div class="row-between">
+        <div class="filebar">
+          <button class="textbtn" id="browseBtn" type="button">open file…</button>
+          <span class="meta" id="fileMeta"></span>
+          <span class="column-pick" id="columnPick" hidden>
+            <label for="columnSelect" class="meta">column</label>
+            <select id="columnSelect"></select>
+          </span>
+          <button class="textbtn" id="batchSample" type="button">load sample</button>
+        </div>
+        <button class="btn solid" id="batchBtn" type="button">Analyze all</button>
+      </div>
+
+      <div id="batchResults" hidden>
+        <hr />
+        <p class="summary" id="summaryLine"></p>
+        <div class="stack big" id="batchStack"></div>
+        <dl class="stack-legend" id="batchLegend"></dl>
+
+        <div class="drivers" id="drivers"></div>
+
+        <div class="label-row table-head">
+          <div class="filters" id="filterSeg" role="group" aria-label="Filter">
+            <button class="textbtn is-active" data-filter="all">all</button>
+            <button class="textbtn" data-filter="positive">positive</button>
+            <button class="textbtn" data-filter="neutral">neutral</button>
+            <button class="textbtn" data-filter="negative">negative</button>
+          </div>
+          <div class="filters">
+            <input type="search" id="tableSearch" placeholder="search" aria-label="Search results" />
+            <button class="textbtn" id="exportBtn" type="button">export csv</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="results">
+            <thead><tr><th class="num">#</th><th>Review</th><th>Sentiment</th><th class="num">Conf.</th></tr></thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= HISTORY ================= -->
+    <section class="view" id="view-history" role="tabpanel" hidden>
+      <div class="label-row">
+        <span class="label">Last 50 single analyses, kept in this browser</span>
+        <button class="textbtn" id="clearHistory" type="button">clear</button>
+      </div>
+      <table class="results history">
+        <tbody id="historyList"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="wrap foot meta">
+    <span>TF-IDF + logistic regression, trained on Amazon product reviews.</span>
+    <a href="/docs" target="_blank" rel="noopener">API docs</a>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
