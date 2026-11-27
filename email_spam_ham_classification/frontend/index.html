@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spam Shield</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%234f46e5' d='M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5z'/></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" class="logo" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5z"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div>
+        <h1>Spam Shield</h1>
+        <p class="sub">Email spam / ham classifier</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="analyze" role="tab">Analyze</button>
+      <button class="tab" data-view="batch" role="tab">Batch</button>
+      <button class="tab" data-view="quarantine" role="tab">Quarantine <span class="badge" id="qCount">0</span></button>
+      <button class="tab" data-view="model" role="tab">Model</button>
+    </nav>
+    <div class="status" id="apiStatus" title="API status"><span class="dot"></span><span class="txt">Connecting…</span></div>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <!-- ANALYZE -->
+    <section class="view active" id="view-analyze">
+      <div class="grid">
+        <div class="card composer">
+          <div class="card-head">
+            <h2>Email content</h2>
+            <span class="muted" id="charCount">0 chars</span>
+          </div>
+          <textarea id="emailInput" placeholder="Paste an email or SMS message here…" spellcheck="false"></textarea>
+          <div class="samples">
+            <span class="muted small">Try a sample:</span>
+            <button class="chip" data-sample="spam1">🎁 Prize winner</button>
+            <button class="chip" data-sample="spam2">📱 Mobile offer</button>
+            <button class="chip" data-sample="ham1">☕ Coffee plans</button>
+            <button class="chip" data-sample="ham2">📅 Meeting note</button>
+          </div>
+          <div class="actions">
+            <button class="btn ghost" id="clearBtn">Clear</button>
+            <button class="btn primary" id="analyzeBtn">
+              <span class="btn-label">Analyze</span><kbd>Ctrl ↵</kbd>
+            </button>
+          </div>
+        </div>
+
+        <div class="card result" id="resultCard">
+          <div class="empty" id="resultEmpty">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m4 7 8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            <p>Results will appear here</p>
+            <span class="muted small">Paste a message and hit Analyze</span>
+          </div>
+          <div class="result-body hidden" id="resultBody">
+            <div class="verdict" id="verdict">
+              <div class="verdict-icon" id="verdictIcon"></div>
+              <div>
+                <div class="verdict-label" id="verdictLabel">—</div>
+                <div class="muted small" id="verdictSub"></div>
+              </div>
+              <div class="gauge" id="gauge">
+                <svg viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" class="g-track"/>
+                  <circle cx="60" cy="60" r="50" class="g-fill" id="gaugeFill"/>
+                </svg>
+                <div class="g-text"><b id="gaugeVal">0%</b><span>spam score</span></div>
+              </div>
+            </div>
+
+            <div class="meter">
+              <div class="meter-labels"><span>Ham</span><span>Spam</span></div>
+              <div class="meter-bar"><div class="meter-mark" id="meterMark"></div></div>
+            </div>
+
+            <h3>Why this verdict</h3>
+            <p class="muted small">Terms the model recognised, weighted by how strongly they push toward spam (red) or ham (green).</p>
+            <ul class="signals" id="signals"></ul>
+
+            <details class="cleaned">
+              <summary>Preprocessed text <span class="muted small" id="termsInfo"></span></summary>
+              <code id="cleanedText"></code>
+            </details>
+          </div>
+        </div>
+      </div>
+
+      <div class="card history">
+        <div class="card-head">
+          <h2>Recent checks</h2>
+          <button class="btn ghost sm" id="clearHistory">Clear history</button>
+        </div>
+        <ul class="history-list" id="historyList"><li class="muted small">No checks yet.</li></ul>
+      </div>
+    </section>
+
+    <!-- BATCH -->
+    <section class="view" id="view-batch">
+      <div class="card">
+        <div class="card-head">
+          <h2>Batch classification</h2>
+          <label class="btn ghost sm file-btn">Upload .txt / .csv<input type="file" id="fileInput" accept=".txt,.csv" hidden /></label>
+        </div>
+        <p class="muted small">One message per line (max 100). For CSV, the last column of each row is used.</p>
+        <textarea id="batchInput" class="batch-input" placeholder="Message 1&#10;Message 2&#10;Message 3"></textarea>
+        <div class="actions">
+          <span class="muted small" id="batchCount">0 messages</span>
+          <button class="btn primary" id="batchBtn"><span class="btn-label">Classify all</span></button>
+        </div>
+      </div>
+      <div class="card hidden" id="batchResults">
+        <div class="card-head">
+          <h2>Results</h2>
+          <div class="row gap">
+            <span class="pill spam" id="bSpam">0 spam</span>
+            <span class="pill ham" id="bHam">0 ham</span>
+            <button class="btn ghost sm" id="exportBtn">Export CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>#</th><th>Message</th><th>Verdict</th><th>Spam score</th></tr></thead><tbody id="batchBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- QUARANTINE -->
+    <section class="view" id="view-quarantine">
+      <div class="card">
+        <div class="card-head">
+          <h2>Quarantined messages</h2>
+          <div class="row gap">
+            <button class="btn ghost sm" id="refreshQ">Refresh</button>
+            <button class="btn danger sm" id="clearQ">Clear all</button>
+          </div>
+        </div>
+        <p class="muted small">Every message classified as spam is stored in <code>data/quarantine/quarantine.csv</code>.</p>
+        <div class="table-wrap"><table><thead><tr><th>When</th><th>Message</th><th>Spam score</th></tr></thead><tbody id="qBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- MODEL -->
+    <section class="view" id="view-model">
+      <div class="stats" id="stats"></div>
+      <div class="grid">
+        <div class="card">
+          <h2>Confusion matrix</h2>
+          <p class="muted small" id="cmSub">Held-out test set</p>
+          <div class="cm" id="cm"></div>
+        </div>
+        <div class="card">
+          <h2>Model details</h2>
+          <dl class="details" id="details"></dl>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>Strongest spam terms</h2><div class="terms spam" id="spamTerms"></div></div>
+        <div class="card"><h2>Strongest ham terms</h2><div class="terms ham" id="hamTerms"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

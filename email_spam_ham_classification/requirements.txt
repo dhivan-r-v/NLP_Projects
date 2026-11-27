@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+nltk
+spacy
+regex
+joblib
+fastapi
+uvicorn
+matplotlib
+seaborn
+requests
+# spaCy English model (needed by src/data/preprocess.py):
+#   python -m spacy download en_core_web_sm
